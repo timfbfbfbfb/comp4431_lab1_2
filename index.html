@@ -22,6 +22,9 @@
 </head>
 
 <style>
+	*{
+		user-select: none;
+	}
 	.black_key { height:100px; background:black; position:absolute; top:260px }
 	.white_key { height:150px; background:white; position:absolute; top:260px }
 	button {
@@ -39,7 +42,10 @@
 		left: 500px;
 		border: 2px solid grey;
 		background: aliceblue;
-		cursor: pointer;
+		cursor: crosshair;
+	}
+	#whiteboard.red{
+		background: #ff9999;
 	}
 </style>
 
@@ -132,9 +138,11 @@
 
 var MIN_PITCH = 21, MAX_PITCH = 108;
 var MIN_AMPLITUDE = 0, MAX_AMPLITUDE = 127;
-var this_pitch;
+var this_pitch = 60;
+var this_amplitude = 100;
 var lowest_pitch=60; // The MIDI pitch number for the first (left) keyboard key
 var chord_mode = 0;
+var isKeyInUse = false;
 var isWhiteBoardInUse = false;
 
 function playSound(){
@@ -192,8 +200,9 @@ function stopSound(){
 };
 
 function handlePianoKeyPress(evt) {
+	isKeyInUse = true;
 
-	var this_key, this_amplitude;
+	var this_key;
 
   // Show a simple message in the console
   console.log("Key press event!");
@@ -220,10 +229,22 @@ function handlePianoKeyPress(evt) {
 
 
 function handlePianoKeyRelease(evt) {
-  // Show a simple message in the console
-  console.log("Key release event!");
+	// Show a simple message in the console
+	if(isKeyInUse){
+	console.log("Key release event!");
 
-  stopSound();
+	isKeyInUse = false;
+	stopSound();
+	}
+};
+
+function handlePianoKeyOut(event){
+	if(isKeyInUse){
+		console.log("Key out event");
+
+		isKeyInUse = false;
+		stopSound();
+	}
 };
 
 function getParamsFromWhiteboard(event){
@@ -237,12 +258,17 @@ function getParamsFromWhiteboard(event){
 	var pitchRange = MAX_PITCH - MIN_PITCH;
 	var amplitudeRange = MAX_AMPLITUDE - MIN_AMPLITUDE;
 
+	percentageX = Math.max(Math.min(percentageX, 1), 0);
+	percentageY = Math.max(Math.min(percentageY, 1), 0);
+
 	this_pitch = Math.trunc(percentageX * pitchRange + MIN_PITCH);
-	this_amplitude = Math.trunc(percentageY * amplitudeRange);
+	this_amplitude = MAX_AMPLITUDE - Math.trunc(percentageY * amplitudeRange);
 }
 
 function handleWhiteboardPress(event){
 	console.log("whiteboard mouse down");
+
+	$("#whiteboard").addClass('red');
 
 	isWhiteBoardInUse = true;
 
@@ -261,11 +287,26 @@ function handleWHiteboardMouseMove(event){
 };
 
 function handleWhiteboardRelease(event){
-	console.log("Whiteboard mouse up");
-	isWhiteBoardInUse = false;
-	stopSound();
+	if(isWhiteBoardInUse){
+		console.log("Whiteboard mouse up");
+
+		$("#whiteboard").removeClass('red');
+
+		isWhiteBoardInUse = false;
+		stopSound();
+	}
 };
 
+function handleWhiteboardOut(event){
+	if(isWhiteBoardInUse){
+		console.log("Whiteboard mouse out");
+
+		$("#whiteboard").removeClass('red');
+
+		isWhiteBoardInUse = false;
+		stopSound();
+	}
+};
 
 $( document ).ready( function() {
 	MIDI.loadPlugin({
@@ -283,9 +324,11 @@ $( document ).ready( function() {
 			// Set up the event handlers for all the buttons
 			$("button").on("mousedown", handlePianoKeyPress);
 			$("button").on("mouseup", handlePianoKeyRelease);
+			$("button").on("mouseout", handlePianoKeyOut);
 			$("#whiteboard").on("mousedown", handleWhiteboardPress);
 			$("#whiteboard").on("mousemove", handleWHiteboardMouseMove);
 			$("#whiteboard").on("mouseup", handleWhiteboardRelease);
+			$("#whiteboard").on("mouseout", handleWhiteboardOut);
 
 			// Instrument change event
 			$("#instrument").change(function(){
